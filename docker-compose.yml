@@ -1,0 +1,63 @@
+
+services:
+  cliente:
+    build:
+      context: ./cliente
+    container_name: seginf-cliente
+    cap_add:
+      - NET_ADMIN
+    networks:
+      lan:
+        ipv4_address: 172.28.10.10
+    command: >
+      sh -c "
+      ip route replace 172.28.20.0/24 via 172.28.10.254 &&
+      sleep infinity
+      "
+    depends_on:
+      - firewall
+
+  firewall:
+    build:
+      context: ./firewall
+    container_name: seginf-firewall
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    networks:
+      lan:
+        ipv4_address: 172.28.10.254
+      dmz:
+        ipv4_address: 172.28.20.254
+
+  web:
+    image: nginx:alpine
+    container_name: seginf-web
+    volumes:
+      - ./web/index.html:/usr/share/nginx/html/index.html:ro
+    networks:
+      dmz:
+        ipv4_address: 172.28.20.10
+
+  restrito:
+    image: python:3.12-alpine
+    container_name: seginf-restrito
+    command: python -m http.server 5432
+    networks:
+      dmz:
+        ipv4_address: 172.28.20.20
+
+networks:
+  lan:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.10.0/24
+
+  dmz:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.20.0/24
